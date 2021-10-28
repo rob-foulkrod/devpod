@@ -35,3 +35,25 @@ jobs:
         with:
           name: published_app
           path: "${{ env.PUB_LOCATION }}/out"
+          
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Download from GitHub
+        uses: actions/download-artifact@v2
+        with:
+          name: published_app
+          path: "${{ env.PUB_LOCATION }}/out"
+
+      - name: Login to azure account
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to test app
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          package: "${{ env.PUB_LOCATION }}/out"
