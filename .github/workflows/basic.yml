@@ -1,0 +1,59 @@
+name: Demo build and deploy
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+  
+
+env:
+  DOTNET_VERSION: "5.0.x"
+  PUB_LOCATION: "."
+  WEBAPP_NAME: "devpod"
+
+jobs:
+  build:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build and publish
+        run: |
+          dotnet restore
+          dotnet build --no-restore
+          dotnet test
+          dotnet publish -c Release -o '${{ env.PUB_LOCATION }}/out'
+
+      - name: Upload to GitHub
+        uses: actions/upload-artifact@v2
+        with:
+          name: published_app
+          path: "${{ env.PUB_LOCATION }}/out"
+          
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Download from GitHub
+        uses: actions/download-artifact@v2
+        with:
+          name: published_app
+          path: "${{ env.PUB_LOCATION }}/out"
+
+      - name: Login to azure account
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to test app
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          package: "${{ env.PUB_LOCATION }}/out"
